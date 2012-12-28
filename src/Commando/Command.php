@@ -12,6 +12,7 @@ class Command implements \ArrayAccess, \Iterator
     const OPTION_TYPE_VERBOSE   = 4; // e.g. --username
 
     private
+        $ignore_unknown_options     = false,
         $current_option             = null,
         $name                       = null,
         $options                    = array(),
@@ -77,8 +78,9 @@ class Command implements \ArrayAccess, \Iterator
         // 'mustBeAFile' => 'file',
     );
 
-    public function __construct($tokens = null)
+    public function __construct($tokens = null, $ignore_unknown_options = FALSE)
     {
+        $this->enableIgnoreUnknownOptions($ignore_unknown_options);
         if (empty($tokens)) {
             $tokens = $_SERVER['argv'];
         }
@@ -395,6 +397,27 @@ class Command implements \ArrayAccess, \Iterator
     }
 
     /**
+     * Does this command ignore unknown options?
+     * @return boolean
+     */
+    public function ignoresUnknownOptions() {
+      return $this->ignore_unknown_options;
+    }
+
+    /**
+     * Set whether or not to ignore unknown options. Unknown options should be treated as booleans.
+     * @param boolean $bool
+     * @throws \Exception
+     * @return \Commando\Command for chaining
+     */
+    public function enableIgnoreUnknownOptions($bool = TRUE) {
+      if($this->isParsed())
+        throw new \Exception('Can\'t change option checking after parsing!');
+      $this->ignore_unknown_options = (bool)$bool;
+      return $this;
+    }
+
+    /**
      * @param string $token
      * @return array [option name/value, OPTION_TYPE_*]
      */
@@ -425,7 +448,11 @@ class Command implements \ArrayAccess, \Iterator
     public function getOption($option)
     {
         if (!$this->hasOption($option)) {
-            throw new \Exception(sprintf('Unknown option, %s, specified', $option));
+            if($this->ignoresUnknownOptions() && !is_numeric($option)) {
+                $this->option($option)->boolean();
+            } else {
+                throw new \Exception(sprintf('Unknown option, %s, specified', $option));
+            }
         }
 
         return $this->options[$option];
