@@ -228,22 +228,22 @@ class Command implements \ArrayAccess, \Iterator
 
     /**
      * @param Option $option
-     * @param \Closure $callback (string $value) -> boolean
+     * @param callable $callback (string $value) -> boolean
      * @return Option
      */
-    private function _must(Option $option, \Closure $callback)
+    private function _must(Option $option, $callback)
     {
-        return $option->setRule($callback);
+        return is_callable($callback) ? $option->setRule($callback) : $this;
     }
 
     /**
      * @param Option $option
-     * @param \Closure $callback
+     * @param callable $callback
      * @return Option
      */
-    private function _map(Option $option, \Closure $callback)
+    private function _map(Option $option, $callback)
     {
-        return $option->setMap($callback);
+        return is_callable($callback) ? $option->setMap($callback) : $this;
     }
 
     private function _file(Option $option, $require_exists = true, $allow_globbing = false)

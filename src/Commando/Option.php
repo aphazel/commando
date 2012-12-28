@@ -128,9 +128,10 @@ class Option
      * @param closure|string $rule regex, closure
      * @return Option
      */
-    public function setMap(\Closure $map)
+    public function setMap($map)
     {
-        $this->map = $map;
+        if(is_callable($map))
+            $this->map = $map;
         return $this;
     }
 
