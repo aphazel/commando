@@ -9,6 +9,24 @@ Commando is a PHP command line interface library that beautifies and simplifies 
 
 PHP's `$argv` magic variable and global `$_SERVER['argv']` make me cringe, [`getopt`](http://php.net/manual/en/function.getopt.php) isn't all that much better, and most other PHP CLI libraries are far too OOP bloated.  Commando gets down to business without a ton of overhead, removes the common boilerplate stuff when it comes to handling cli input, all while providing a clean and readable interface.
 
+## Installation
+
+*Commando requires that you are running PHP 5.3 or higher.*
+
+Commando is [PSR-0](https://github.com/php-fig/fig-standards/blob/master/accepted/PSR-0.md) compliant and can be installed using [Composer](http://getcomposer.org/).  Add `nategood/commando` to your `composer.json`
+
+    "require": {
+        "nategood/commando": "*"
+    }
+
+If you're new to Composer...
+
+ - [Download and build Composer](http://getcomposer.org/download/)
+ - Make it [globally accessible](http://getcomposer.org/doc/00-intro.md#globally)
+ - `cd` to your the directory where you'll be writing your Commando script and run `composer install`
+
+*Currently installing via Composer is the only supported option.*
+
 ## Example
 
 Here is an example of a PHP Commando script that gives a decent tour of Commando's features.  Let's say it is in a file called `hello.php`.
@@ -16,7 +34,9 @@ Here is an example of a PHP Commando script that gives a decent tour of Commando
 ``` php
 <?php
 
-$hello_cmd = new Command();
+require_once 'vendor/autoload.php';
+
+$hello_cmd = new Commando\Command();
 
 // Define first option
 $hello_cmd->option()
@@ -67,22 +87,6 @@ Things to note:
  - For "annonymous" (i.e. not a named flag) arguments, we access them based on their numeric index
  - We can access option values in an array via a flags name OR it's alias
  - We can use closures to perform validation and map operations right as part of our option definition
-
-## Installation
-
-Commando is [PSR-0](https://github.com/php-fig/fig-standards/blob/master/accepted/PSR-0.md) compliant and can be installed using [Composer](http://getcomposer.org/).  Add `nategood/commando` to your `composer.json`
-
-    "require": {
-        "nategood/commando": "*"
-    }
-
-If you're new to Composer...
-
- - [Download and build Composer](http://getcomposer.org/download/)
- - Make it [globally accessible](http://getcomposer.org/doc/00-intro.md#globally)
- - `cd` to your the directory where you'll be writing your Commando script and run `composer install`
-
-*Currently installing via Composer is the only option (phar build coming soon).*
 
 ## Baked in Help
 
@@ -137,13 +141,13 @@ Return array of values for arguments provided to the command. E.g. `array('value
 
 These options work on the "option" level, even though they are chained to a `Command` instance
 
-### `option (mixed name = null)`
+### `option (mixed $name = null)`
 
 Aliases: `o`
 
 Define a new option.  When `name` is set, the option will be a named "flag" option.  Can be a short form option (e.g. `f` for option `-f`) or long form (e.g. `foo` for option --foo).  When no `name` is defined, the option is an annonymous argument and is referenced in the future by it's position.
 
-### `flag (string name)`
+### `flag (string $name)`
 
 Same as `option` except that it can only be used to define "flag" type options (a.k.a. those options that must be specified with a -flag on the command line).
 
@@ -151,41 +155,67 @@ Same as `option` except that it can only be used to define "flag" type options (
 
 Same as `option` except that it can only be used to define "argument" type options (a.k.a those options that are specified WITHOUT a -flag on the command line).
 
-### `alias (string alias)`
+### `alias (string $alias)`
 
 Aliases: `a`, `aka`
 
 Add an alias for a named option.  This method can be called multiple times to add multiple aliases.
 
-### `description (string description)`
+### `description (string $description)`
 
 Aliases: `d`, `describe`, `describedAs`
 
 Text to describe this option.  This text will be used to build the "help" page and as such, it is end user facing.
 
-### `require (bool require)`
+### `require (bool $require)`
 
 Aliases: `r`, `required`
 
 Require that this flag is specified
 
-### `must (Closure rule)`
+### `needs (string|array $options)`
+
+Aliases: none
+
+Require that other $options be set for this option to be used.
+
+### `must (Closure $rule)`
 
 Aliases: _N/A_
 
 Define a rule to validate input against.  Takes function that accepts a string $value and returns a boolean as to whether or not $value is valid.
 
-### `map (Closure map)`
+### `map (Closure $map)`
 
 Aliases: `cast`, `castTo`
 
 Perform a map operation on the value for this option.  Takes function that accepts a string $value and return mixed (you can map to whatever you wish).
 
-### `referToAs (string name)`
+### `referToAs (string $name)`
 
 Aliases: `title`, `referredToAs`
 
 Add a name to refer to an argument option by.  Makes the help docs a little cleaner for annonymous "argument" options.
+
+### `boolean ()`
+
+Aliases: _N/A_
+
+Specifices that the flag is a boolean type flag.
+
+### `default (mixed $defaultValue)`
+
+Aliases: `defaultsTo`
+
+If the value is not specified, default to `$defaultValue`. 
+
+In the case of `boolean()` type flags, when the flag is present, the value of this option the negation of `$defaultValue`. That is to say, if you have a flag -b with a default of `true`, when -b is present as a command line flag, the value of the option will be `false`.
+
+### `file ()`
+
+Aliases: `expectsFile`
+
+The value specified for this option must be a valid file path. When used relative paths will be converted into fully quatified file paths and globbing is also optionally supported.  See the file.php example.
 
 ## Contributing
 
@@ -205,6 +235,26 @@ Commando highly encourages sending in pull requests.  When submitting a pull req
 Released under MIT license.
 
 ## Change Log
+### v0.2.6
+
+ - Adds support for "needs" to define dependencies between options (thanks @enygma) [PR #31](https://github.com/nategood/commando/pull/31)
+ - Fixes issue with long-argument-names [Issue #30](https://github.com/nategood/commando/issues/30)
+
+### v0.2.5
+
+ - Fixed up default values for boolean options, automatically default boolean options to false (unlikely, but potentially breaking change) [PR #19](https://github.com/nategood/commando/pull/19)
+
+### v0.2.4
+
+ - Added abilty to define default values for options
+
+### v0.2.3
+
+ - Improved Help Formatting [PR #12](https://github.com/nategood/commando/pull/12)
+
+### v0.2.2
+
+ - Bug fix for printing double help [PR #10](https://github.com/nategood/commando/pull/10)
 
 ### v0.2.1
 
@@ -240,3 +290,7 @@ php command.php -f value1 --long value2 value3 value4 value5
 
 ### v0.1.2
  - Terminal updated to use tput correctly
+
+
+[![Bitdeli Badge](https://d2weczhvl823v0.cloudfront.net/nategood/commando/trend.png)](https://bitdeli.com/free "Bitdeli Badge")
+

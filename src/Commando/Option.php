@@ -1,7 +1,7 @@
 <?php
 
 namespace Commando;
-
+use \Commando\Util\Terminal;
 class Option
 {
     private
@@ -11,10 +11,12 @@ class Option
         $value = null, /* mixed */
         $description, /* string */
         $required = false, /* bool */
+        $needs = array(), /* set of other required options for this option */
         $boolean = false, /* bool */
         $type = 0, /* int see constants */
         $rule, /* closure */
         $map, /* closure */
+        $default, /* mixed default value for this option when no value is specified */
         $file = false, /* bool */
         $file_require_exists, /* bool require that the file path is valid */
         $file_allow_globbing; /* bool allow globbing for files */
@@ -70,6 +72,10 @@ class Option
      */
     public function setBoolean($bool = true)
     {
+        // if we didn't define a default already, set false as the default value...
+        if($this->default === null) {
+            $this->setDefault(false);
+        }
         $this->boolean = $bool;
         return $this;
     }
@@ -115,6 +121,41 @@ class Option
     }
 
     /**
+     * Set an option as required
+     *
+     * @param string $option Option name
+     */
+    public function setNeeds($option)
+    {
+        if (!is_array($option)) {
+            $option = array($option);
+        }
+        foreach ($option as $opt) {
+            $this->needs[] = $opt;
+        }
+        return $this;
+    }
+
+    /**
+     * @param mixed $value default value
+     * @return Option
+     */
+    public function setDefault($value)
+    {
+        $this->default = $value;
+        $this->setValue($value);
+        return $this;
+    }
+
+    /**
+     * @return mixed
+     */
+    public function getDefault()
+    {
+        return $this->default;
+    }
+
+    /**
      * @param closure|string $rule regex, closure
      * @return Option
      */
@@ -134,7 +175,6 @@ class Option
             $this->map = $map;
         return $this;
     }
-
 
     /**
      * @param closure|string $rule regex, closure
@@ -220,6 +260,15 @@ class Option
     }
 
     /**
+     * Get the current set of this option's requirements
+     * @return array List of required options
+     */
+    public function getNeeds()
+    {
+        return $this->needs;
+    }
+
+    /**
      * @return bool is this option a boolean
      */
     public function isBoolean()
@@ -245,15 +294,36 @@ class Option
     }
 
     /**
+     * Check to see if requirements list for option are met
+     *
+     * @param array $optionsList Set of current options defined
+     * @return boolean|array True if requirements met, array if not found
+     */
+    public function hasNeeds($optionsList)
+    {
+        $needs = $this->getNeeds();
+
+        $definedOptions = array_keys($optionsList);
+        $notFound = array();
+        foreach ($needs as $need) {
+            if (!in_array($need, $definedOptions)) {
+                $notFound[] = $need;
+            }
+        }
+        return (empty($notFound)) ? true : $notFound;
+
+    }
+
+    /**
      * @param mixed value for this option (set on the command line)
      */
     public function setValue($value)
     {
         if ($this->isBoolean() && !is_bool($value)) {
-            throw new \Exception(sprintf('Boolean option expected for option -%s, received %s value instead', $this->name, $value));
+            throw new \Exception(sprintf('Boolean option expected for option %s, received %s value instead', $this->name, $value));
         }
         if (!$this->validate($value)) {
-            throw new \Exception(sprintf('Invalid value, %s, for option -%s', $value, $this->name));
+            throw new \Exception(sprintf('Invalid value, %s, for option %s', $value, $this->name));
         }
         if ($this->isFile()) {
             $file_path = $this->parseFilePath($value);
@@ -276,7 +346,9 @@ class Option
         $color = new \Colors\Color();
         $help = '';
 
-        if ($this->type & self::TYPE_NAMED) {
+        $isNamed = ($this->type & self::TYPE_NAMED);
+
+        if ($isNamed) {
             $help .=  PHP_EOL . (mb_strlen($this->name, 'UTF-8') === 1 ?
                 '-' : '--') . $this->name;
             if (!empty($this->aliases)) {
@@ -286,21 +358,38 @@ class Option
                 }
             }
             if (!$this->isBoolean()) {
-                $help .= ' ' . $color('<argument>')->underline();
+                $help .= ' ' . $color->underline('<argument>');
             }
             $help .= PHP_EOL;
         } else {
             $help .= (empty($this->title) ? "arg {$this->name}" : $this->title) . PHP_EOL;
         }
 
-        $description = $this->description;
-        if ($this->isRequired()) {
-            $description = 'Required.  ' . $description;
+        // bold what has been displayed so far
+        $help = $color->bold($help);
+
+        $titleLine = '';
+        if($isNamed && $this->title) {
+            $titleLine .= $this->title . '.';
+            if ($this->isRequired()) {
+                $titleLine .= ' ';
+            }
         }
 
+        if ($this->isRequired()) {
+            $titleLine .= $color->red('Required.');
+        }
+
+        if($titleLine){
+            $titleLine .= ' ';
+        }
+        $description = $titleLine . $this->description;
         if (!empty($description)) {
-            $help .= \Commando\Util\Terminal::wrap(
-                $this->title . $description, 5, 1);
+            $descriptionArray = explode(PHP_EOL, trim($description));
+            foreach($descriptionArray as $descriptionLine){
+                $help .= Terminal::wrap($descriptionLine, 5, 1) . PHP_EOL;
+            }
+
         }
 
         return $help;

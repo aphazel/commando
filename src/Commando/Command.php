@@ -71,11 +71,15 @@ class Command implements \ArrayAccess, \Iterator
         // mustBeNumeric
         // mustBeInt
         // mustBeFloat
+        'needs' => 'needs',
 
         'file' => 'file',
         'expectsFile' => 'file',
         // 'expectsFileGlob' => 'file',
         // 'mustBeAFile' => 'file',
+
+        'default' => 'default',
+        'defaultsTo' => 'default',
     );
 
     public function __construct($tokens = null, $ignore_unknown_options = FALSE)
@@ -86,6 +90,13 @@ class Command implements \ArrayAccess, \Iterator
         }
 
         $this->setTokens($tokens);
+    }
+
+    public function __destruct()
+    {
+        if (!$this->parsed) {
+            $this->parse();
+        }
     }
 
     /**
@@ -198,6 +209,18 @@ class Command implements \ArrayAccess, \Iterator
     }
 
     /**
+     * Set a requirement on an option
+     *
+     * @param \Commando\Option $option Current option
+     * @param string $name Name of option
+     * @return \Commando\Option instance
+     */
+    private function _needs(Option $option, $name)
+    {
+        return $option->setNeeds($name);
+    }
+
+    /**
      * @param Option $option
      * @param string $alias
      * @return Option
@@ -248,6 +271,16 @@ class Command implements \ArrayAccess, \Iterator
         return is_callable($callback) ? $option->setMap($callback) : $this;
     }
 
+    /**
+     * @return Option
+     * @param $option Option
+     * @param mixed $value
+     */
+    private function _default(Option $option, $value)
+    {
+        return $option->setDefault($value);
+    }
+
     private function _file(Option $option, $require_exists = true, $allow_globbing = false)
     {
         return $option->setFileRequirements($require_exists, $allow_globbing);
@@ -288,6 +321,8 @@ class Command implements \ArrayAccess, \Iterator
      */
     public function parse()
     {
+        $this->parsed = true;
+
         try {
             $tokens = $this->tokens;
             // the executed filename
@@ -322,7 +357,7 @@ class Command implements \ArrayAccess, \Iterator
 
                     $option = $this->getOption($name);
                     if ($option->isBoolean()) {
-                        $keyvals[$name] = true;
+                        $keyvals[$name] = !$option->getDefault();// inverse of the default, as expected
                     } else {
                         // the next token MUST be an "argument" and not another flag/option
                         $token = array_shift($tokens);
@@ -334,8 +369,19 @@ class Command implements \ArrayAccess, \Iterator
                 }
             }
 
+            // See if our options have what they require
+            foreach ($this->options as $option) {
+                $needs = $option->hasNeeds($this->options);
+                if ($needs !== true) {
+                    throw new \InvalidArgumentException(
+                        'Option "'.$option->getName().'" does not have required option(s): '.implode(', ', $needs)
+                    );
+                }
+            }
+
             // Set values (validates and performs map when applicable)
             foreach ($keyvals as $key => $value) {
+
                 $this->getOption($key)->setValue($value);
             }
 
@@ -363,9 +409,6 @@ class Command implements \ArrayAccess, \Iterator
             // Used in the \Iterator implementation
             $this->sorted_keys = array_keys($this->options);
             natsort($this->sorted_keys);
-
-            $this->parsed = true;
-
         } catch(\Exception $e) {
             $this->error($e);
         }
@@ -425,7 +468,7 @@ class Command implements \ArrayAccess, \Iterator
     {
         $matches = array();
 
-        if (substr($token, 0, 1) === '-' && !preg_match('/(?P<hyphen>\-{1,2})(?P<name>[a-z][a-z0-9_]*)/i', $token, $matches)) {
+        if (substr($token, 0, 1) === '-' && !preg_match('/(?P<hyphen>\-{1,2})(?P<name>[a-z][a-z0-9_-]*)/i', $token, $matches)) {
             throw new \Exception(sprintf('Unable to parse option %s: Invalid syntax', $token));
         }
 
@@ -456,6 +499,15 @@ class Command implements \ArrayAccess, \Iterator
         }
 
         return $this->options[$option];
+    }
+
+    /**
+     * @return array of `Option`s
+     */
+    public function getOptions()
+    {
+        $this->parseIfNotParsed();
+        return $this->options;
     }
 
     /**
@@ -613,7 +665,7 @@ class Command implements \ArrayAccess, \Iterator
 
         $seen = array();
         $keys = array_keys($this->options);
-        sort($keys, SORT_NATURAL);
+        natsort($keys);
         foreach ($keys as $key) {
             $option = $this->getOption($key);
             if (in_array($option, $seen)) {

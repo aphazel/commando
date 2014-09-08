@@ -78,7 +78,7 @@ class CommandTest extends \PHPUnit_Framework_TestCase
     }
 
     // Test retrieving a previously defined option via option($name)
-    public function testRevtrievingOptionNamed()
+    public function testRetrievingOptionNamed()
     {
         // Short flag
         $tokens = array('filename', '-f', 'val');
@@ -94,7 +94,7 @@ class CommandTest extends \PHPUnit_Framework_TestCase
     }
 
     // Test retrieving a previously defined option via option($name)
-    public function testRevtrievingOptionAnon()
+    public function testRetrievingOptionAnon()
     {
         // Annonymous
         $tokens = array('filename', 'arg1', 'arg2', 'arg3');
@@ -108,6 +108,38 @@ class CommandTest extends \PHPUnit_Framework_TestCase
         $this->assertEquals(1, $cmd->getSize());
     }
 
+    public function testBooleanOption()
+    {
+        // with bool flag
+        $tokens = array('filename', 'arg1', '-b', 'arg2');
+        $cmd = new Command($tokens);
+        $cmd->option('b')
+            ->boolean();
+        $this->assertTrue($cmd['b']);
+        // without
+        $tokens = array('filename', 'arg1', 'arg2');
+        $cmd = new Command($tokens);
+        $cmd->option('b')
+            ->boolean();
+        $this->assertFalse($cmd['b']);
+
+        // try inverse bool default operations...
+        // with bool flag
+        $tokens = array('filename', 'arg1', '-b', 'arg2');
+        $cmd = new Command($tokens);
+        $cmd->option('b')
+            ->default(true)
+            ->boolean();
+        $this->assertFalse($cmd['b']);
+        // without
+        $tokens = array('filename', 'arg1', 'arg2');
+        $cmd = new Command($tokens);
+        $cmd->option('b')
+            ->default(true)
+            ->boolean();
+        $this->assertTrue($cmd['b']);
+    }
+
     public function testGetValues()
     {
         $tokens = array('filename', '-a', 'v1', '-b', 'v2', 'v3', 'v4', 'v5');
@@ -118,6 +150,36 @@ class CommandTest extends \PHPUnit_Framework_TestCase
 
         $this->assertEquals(array('v3', 'v4', 'v5'), $cmd->getArgumentValues());
         $this->assertEquals(array('a' => 'v1', 'b' => 'v2'), $cmd->getFlagValues());
+    }
+
+    /**
+     * Ensure that requirements are resolved correctly
+     */
+    public function testRequirementsOnOptionsValid()
+    {
+        $tokens = array('filename', '-a', 'v1', '-b', 'v2');
+        $cmd = new Command($tokens);
+
+        $cmd->option('b');
+        $cmd->option('a')
+            ->needs('b');
+
+        $this->assertEquals($cmd['a'], 'v1');
+    }
+
+    /**
+     * Test that an exception is thrown when an option isn't set
+     * @expectedException \InvalidArgumentException
+     */
+    public function testRequirementsOnOptionsMissing()
+    {
+        $tokens = array('filename', '-a', 'v1');
+        $cmd = new Command($tokens);
+
+        $cmd->trapErrors(false)
+            ->beepOnError(false);
+        $cmd->option('a')
+        ->needs('b');
     }
 
 }

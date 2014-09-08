@@ -1,6 +1,6 @@
 <?php
 
-namespace Commano\Test;
+namespace Commando\Test;
 
 require dirname(dirname(__DIR__)) . '/vendor/autoload.php';
 
@@ -121,6 +121,41 @@ class OptionTest extends \PHPUnit_Framework_TestCase
         $this->assertTrue(in_array($file2, $values));
     }
 
+    /**
+     * @dataProvider values
+     */
+    public function testDefault($val)
+    {
+        $option = new Option('f');
+        $option->setDefault($val);
+        $this->assertEquals($val, $option->getValue());
+    }
+
+    /**
+     * Test that requires options are set correctly
+     */
+    public function testSetRequired()
+    {
+        $option = new Option('f');
+        $option->setNeeds('foo');
+
+        $this->assertTrue(in_array('foo', $option->getNeeds()));
+    }
+
+    /**
+     * Test that the needed requirements are met
+     */
+    public function testOptionRequirementsMet()
+    {
+        $option = new Option('f');
+        $option->setNeeds('foo');
+        $optionSet = array(
+            'foo' => new Option('foo')
+        );
+
+        $this->assertTrue($option->hasNeeds($optionSet));
+    }
+
     // Providers
 
     public function values()
@@ -131,6 +166,10 @@ class OptionTest extends \PHPUnit_Framework_TestCase
             array('200'),
             array(200),
             array(0),
+            array(1.5),
+            array(0.0),
+            array(true),
+            array(false),
         );
     }
 }
